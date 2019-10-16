@@ -18,19 +18,22 @@
 #ifndef __tsid_python_robot_wrapper_hpp__
 #define __tsid_python_robot_wrapper_hpp__
 
+#include <pinocchio/fwd.hpp>
 #include <boost/python.hpp>
 #include <string>
 #include <eigenpy/eigenpy.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
+#include <boost/python/make_constructor.hpp>
 
+#include <pinocchio/bindings/python/parsers/parsers.hpp>
 #include "tsid/robots/robot-wrapper.hpp"
 
 namespace tsid
 {
   namespace python
-  {    
+  {
     namespace bp = boost::python;
-    
+
     template<typename Robot>
     struct RobotPythonVisitor
     : public boost::python::def_visitor< RobotPythonVisitor<Robot> >
@@ -38,16 +41,19 @@ namespace tsid
       typedef std::vector<std::string> std_vec;
       typedef Eigen::Matrix<double,3,Eigen::Dynamic> Matrix3x;
 
-      template<class PyClass>     
+      template<class PyClass >
 
       void visit(PyClass& cl) const
       {
         cl
         .def(bp::init<std::string, std_vec, bool>((bp::arg("filename"), bp::arg("package_dir"), bp::arg("verbose")), "Default constructor without RootJoint."))
-        .def(bp::init<std::string, std_vec, pinocchio::JointModelVariant, bool>((bp::arg("filename"), bp::arg("package_dir"), bp::arg("roottype"), bp::arg("verbose")), "Default constructor without RootJoint."))
+        .def(bp::init<pinocchio::Model, bool>((bp::arg("Pinocchio Model"), bp::arg("verbose")), "Default constructor from pinocchio model"))
+        .def(bp::init<std::string, std_vec, pinocchio::JointModelVariant &, bool>((bp::arg("filename"), bp::arg("package_dir"), bp::arg("roottype"), bp::arg("verbose")), "Default constructor without RootJoint."))
+        .def("__init__",bp::make_constructor(RobotPythonVisitor<Robot> ::makeClass))
         .add_property("nq", &Robot::nq)
         .add_property("nv", &Robot::nv)
-        
+        .add_property("na", &Robot::na)
+
         .def("model", &RobotPythonVisitor::model)
         .def("data", &RobotPythonVisitor::data)
 
@@ -55,25 +61,44 @@ namespace tsid
         .add_property("gear_ratios", &RobotPythonVisitor::gear_ratios)
         .def("set_rotor_inertias", &RobotPythonVisitor::set_rotor_inertias, bp::arg("inertia vector"))
         .def("set_gear_ratios", &RobotPythonVisitor::set_gear_ratios, bp::arg("gear ratio vector"))
-        
+
         .def("computeAllTerms", &RobotPythonVisitor::computeAllTerms, bp::args("data", "q", "v"), "compute all dynamics")
         .def("com", &RobotPythonVisitor::com, bp::arg("data"))
         .def("com_vel", &RobotPythonVisitor::com_vel, bp::arg("data"))
         .def("com_acc", &RobotPythonVisitor::com_acc, bp::arg("data"))
         .def("Jcom", &RobotPythonVisitor::Jcom, bp::arg("data"))
-        .def("mass", &RobotPythonVisitor::mass, bp::arg("data")) 
+        .def("mass", &RobotPythonVisitor::mass, bp::arg("data"))
         .def("nonLinearEffect", &RobotPythonVisitor::nonLinearEffects, bp::arg("data"))
-        .def("position", &RobotPythonVisitor::position, bp::args("data", "index")) 
+        .def("position", &RobotPythonVisitor::position, bp::args("data", "index"))
         .def("velocity", &RobotPythonVisitor::velocity, bp::args("data", "index"))
         .def("acceleration", &RobotPythonVisitor::acceleration, bp::args("data", "index"))
-        
+
         .def("framePosition", &RobotPythonVisitor::framePosition, bp::args("data", "index"))
         .def("frameVelocity", &RobotPythonVisitor::frameVelocity, bp::args("data", "index"))
         .def("frameAcceleration", &RobotPythonVisitor::frameAcceleration, bp::args("data", "index"))
         .def("frameClassicAcceleration", &RobotPythonVisitor::frameClassicAcceleration, bp::args("data", "index"))
-   
+        .def("frameVelocityWorldOriented", &RobotPythonVisitor::frameVelocityWorldOriented, bp::args("data", "index"))
+        .def("frameAccelerationWorldOriented", &RobotPythonVisitor::frameAccelerationWorldOriented, bp::args("data", "index"))
+        .def("frameClassicAccelerationWorldOriented", &RobotPythonVisitor::frameClassicAccelerationWorldOriented, bp::args("data", "index"))
+
         ;
       }
+
+      static boost::shared_ptr<Robot> makeClass(const std::string &filename,
+                                                const std::vector<std::string>
+                                                &stdvec,
+                                                bp::object & bpObject,
+                                                bool verbose)
+      {
+        pinocchio::JointModelFreeFlyer root_joint =
+            bp::extract<pinocchio::JointModelFreeFlyer>(bpObject)();
+        boost::shared_ptr<Robot> p(new tsid::robots::RobotWrapper(filename,
+                                                                  stdvec,
+                                                                  root_joint,
+                                                                  verbose));
+        return p;
+      }
+
       static pinocchio::Model model (const Robot & self){
         return self.model();
       }
@@ -102,10 +127,10 @@ namespace tsid
       }
       static Eigen::Vector3d com_acc (const Robot & self, const pinocchio::Data & data){
         return self.com_acc(data);
-      } 
+      }
       static Matrix3x Jcom (const Robot & self, const pinocchio::Data & data){
         return self.Jcom(data);
-      } 
+      }
       static void computeAllTerms (const Robot & self, pinocchio::Data & data, const Eigen::VectorXd & q, const Eigen::VectorXd & v){
          self.computeAllTerms(data, q, v);
       }
@@ -136,7 +161,15 @@ namespace tsid
       static pinocchio::Motion frameClassicAcceleration(const Robot & self, const pinocchio::Data & data, const pinocchio::Model::FrameIndex & index){
         return self.frameClassicAcceleration(data, index);
       }
-      
+      static pinocchio::Motion frameVelocityWorldOriented(const Robot & self, const pinocchio::Data & data, const pinocchio::Model::FrameIndex & index){
+        return self.frameVelocityWorldOriented(data, index);
+      }
+      static pinocchio::Motion frameAccelerationWorldOriented(const Robot & self, const pinocchio::Data & data, const pinocchio::Model::FrameIndex & index){
+        return self.frameAccelerationWorldOriented(data, index);
+      }
+      static pinocchio::Motion frameClassicAccelerationWorldOriented(const Robot & self, const pinocchio::Data & data, const pinocchio::Model::FrameIndex & index){
+        return self.frameClassicAccelerationWorldOriented(data, index);
+      }
       static void expose(const std::string & class_name)
       {
         std::string doc = "Robot Wrapper info.";

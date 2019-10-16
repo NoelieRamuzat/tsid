@@ -18,6 +18,7 @@
 #ifndef __tsid_python_HQPOutput_hpp__
 #define __tsid_python_HQPOutput_hpp__
 
+#include <pinocchio/fwd.hpp>
 #include <boost/python.hpp>
 #include <string>
 #include <eigenpy/eigenpy.hpp>
@@ -30,6 +31,9 @@
 #include "tsid/tasks/task-joint-posture.hpp"
 #include "tsid/tasks/task-se3-equality.hpp"
 #include "tsid/tasks/task-com-equality.hpp"
+#include "tsid/tasks/task-actuation-bounds.hpp"
+#include "tsid/tasks/task-joint-bounds.hpp"
+
 namespace tsid
 {
   namespace python
@@ -54,7 +58,8 @@ namespace tsid
         .def("addMotionTask", &InvDynPythonVisitor::addMotionTask_SE3, bp::args("task", "weight", "priorityLevel", "transition duration"))
         .def("addMotionTask", &InvDynPythonVisitor::addMotionTask_COM, bp::args("task", "weight", "priorityLevel", "transition duration"))
         .def("addMotionTask", &InvDynPythonVisitor::addMotionTask_Joint, bp::args("task", "weight", "priorityLevel", "transition duration"))
-        
+        .def("addMotionTask", &InvDynPythonVisitor::addMotionTask_JointBounds, bp::args("task", "weight", "priorityLevel", "transition duration"))
+        .def("addActuationTask", &InvDynPythonVisitor::addActuationTask_Bounds, bp::args("task", "weight", "priorityLevel", "transition duration"))
         
         .def("updateTaskWeight", &InvDynPythonVisitor::updateTaskWeight, bp::args("task_name", "weight"))
         .def("addRigidContact", &InvDynPythonVisitor::addRigidContact6dDeprecated, bp::args("contact"))
@@ -63,6 +68,7 @@ namespace tsid
         .def("addRigidContact", &InvDynPythonVisitor::addRigidContactPointWithPriorityLevel, bp::args("contact", "force_reg_weight", "motion_weight", "priority_level"))
         .def("removeTask", &InvDynPythonVisitor::removeTask, bp::args("task_name", "duration"))
         .def("removeRigidContact", &InvDynPythonVisitor::removeRigidContact, bp::args("contact_name", "duration"))
+        .def("removeFromHqpData", &InvDynPythonVisitor::removeFromHqpData, bp::args("constraint_name"))
         .def("computeProblemData", &InvDynPythonVisitor::computeProblemData, bp::args("time", "q", "v"))
         
         .def("getActuatorForces", &InvDynPythonVisitor::getActuatorForces, bp::args("HQPOutput"))
@@ -84,6 +90,12 @@ namespace tsid
       }
       static bool addMotionTask_Joint(T & self, tasks::TaskJointPosture & task, double weight, unsigned int priorityLevel, double transition_duration){
         return self.addMotionTask(task, weight, priorityLevel, transition_duration);
+      }
+      static bool addMotionTask_JointBounds(T & self, tasks::TaskJointBounds & task, double weight, unsigned int priorityLevel, double transition_duration){
+        return self.addMotionTask(task, weight, priorityLevel, transition_duration);
+      }
+      static bool addActuationTask_Bounds(T & self, tasks::TaskActuationBounds & task, double weight, unsigned int priorityLevel, double transition_duration){
+        return self.addActuationTask(task, weight, priorityLevel, transition_duration);
       }
       static bool updateTaskWeight(T& self, const std::string & task_name, double weight){
         return self.updateTaskWeight(task_name, weight);
@@ -108,7 +120,10 @@ namespace tsid
       }  
       static bool removeRigidContact(T& self, const std::string & contactName, double transition_duration){
         return self.removeRigidContact(contactName, transition_duration);
-      } 
+      }
+      static bool removeFromHqpData(T& self, const std::string & constraintName){
+        return self.removeFromHqpData(constraintName);
+      }
       static HQPDatas computeProblemData(T& self, double time, const Eigen::VectorXd & q, const Eigen::VectorXd & v){
         HQPDatas Hqp;
         Hqp.set(self.computeProblemData(time, q, v));
@@ -124,13 +139,13 @@ namespace tsid
         return self.getContactForces(sol);
       }
       static bool checkContact(T& self, const std::string & name,  const solvers::HQPOutput & sol){
-          Eigen::VectorXd f(12);
-          return self.getContactForces(name, sol, f);
+          tsid::math::Vector f = self.getContactForces(name, sol);
+          if(f.size()>0)
+              return true;
+          return false;
       }
       static Eigen::VectorXd getContactForce (T & self, const std::string & name, const solvers::HQPOutput & sol){
-          Eigen::VectorXd f(12);
-          self.getContactForces(name, sol, f);
-          return f;
+          return self.getContactForces(name, sol);
       }
 
 

@@ -117,10 +117,23 @@ void ContactPoint:: updateForceGeneratorMatrix()
 unsigned int ContactPoint::n_motion() const { return m_motionTask.dim(); }
 unsigned int ContactPoint::n_force() const { return 3; }
 
-const Vector & ContactPoint::Kp() const { return m_motionTask.Kp(); }
-const Vector & ContactPoint::Kd() const { return m_motionTask.Kd(); }
-void ContactPoint::Kp(ConstRefVector Kp){ m_motionTask.Kp(Kp); }
-void ContactPoint::Kd(ConstRefVector Kd){ m_motionTask.Kd(Kd); }
+const Vector & ContactPoint::Kp() const { return m_motionTask.Kp().head<3>(); }
+const Vector & ContactPoint::Kd() const { return m_motionTask.Kd().head<3>(); }
+void ContactPoint::Kp(ConstRefVector Kp)
+{
+  assert(Kp.size()==3);
+  Vector6 Kp6;
+  Kp6.head<3>() = Kp;
+  m_motionTask.Kp(Kp6);
+}
+
+void ContactPoint::Kd(ConstRefVector Kd)
+{
+  assert(Kd.size()==3);
+  Vector6 Kd6;
+  Kd6.head<3>() = Kd;
+  m_motionTask.Kd(Kd6);
+}
 
 bool ContactPoint::setContactNormal(ConstRefVector contactNormal)
 {
